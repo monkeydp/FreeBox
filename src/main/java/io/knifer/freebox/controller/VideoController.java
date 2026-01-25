@@ -7,6 +7,7 @@ import com.google.common.net.HttpHeaders;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.knifer.freebox.component.node.player.BasePlayer;
+import io.knifer.freebox.component.node.player.VLCPlayer;
 import io.knifer.freebox.constant.BaseValues;
 import io.knifer.freebox.constant.CacheKeys;
 import io.knifer.freebox.constant.I18nKeys;
@@ -70,6 +71,13 @@ import java.util.function.Consumer;
  */
 @Slf4j
 public class VideoController extends BaseController implements Destroyable {
+
+    @FXML
+    private Button openInPotPlayerBtn;
+
+    private String currentPlayUrl;
+    private Map<String, String> currentPlayHeaders;
+    private String currentVideoTitle;
 
     @FXML
     private HBox root;
@@ -494,9 +502,25 @@ public class VideoController extends BaseController implements Destroyable {
                                             isAdFiltered
                                     );
 
-                                    Platform.runLater(() -> player.play(tvPlayBO));
+                                    Platform.runLater(() -> {
+                                        // --- 【新增代码：情况1】记录代理后的URL ---
+                                        this.currentPlayUrl = proxyUrl;
+                                        this.currentPlayHeaders = headers;
+                                        this.currentVideoTitle = videoTitle;
+                                        if (openInPotPlayerBtn != null) openInPotPlayerBtn.setDisable(false);
+                                        // ------------------------------------
+
+                                        player.play(tvPlayBO);
+                                    });
                                 });
                             } else {
+                                // --- 【新增代码：情况2】记录原始URL ---
+                                this.currentPlayUrl = playUrl;
+                                this.currentPlayHeaders = headers;
+                                this.currentVideoTitle = videoTitle;
+                                if (openInPotPlayerBtn != null) openInPotPlayerBtn.setDisable(false);
+                                // ------------------------------------
+
                                 player.play(TVPlayBO.of(
                                         playUrl, headers, videoTitle, progress, false
                                 ));
@@ -698,5 +722,20 @@ public class VideoController extends BaseController implements Destroyable {
             }
             operationLoading.set(false);
         });
+    }
+
+    @FXML
+    void onOpenInPotPlayerBtnAction() { // 不要带 ActionEvent 参数也可以，或者带上 import
+        if (StringUtils.isBlank(currentPlayUrl)) {
+            ToastHelper.showInfo("请先选择一集开始播放");
+            return;
+        }
+
+        // 关键：强转为 VLCPlayer 调用我们写的新方法
+        if (this.player instanceof VLCPlayer) {
+            ((VLCPlayer) this.player).launchPotPlayer(currentPlayUrl, currentPlayHeaders, currentVideoTitle);
+        } else {
+            ToastHelper.showInfo("请在设置中将播放器切换为 VLC");
+        }
     }
 }

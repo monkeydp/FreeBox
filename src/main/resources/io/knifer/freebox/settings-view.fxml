@@ -281,7 +281,7 @@
 
                                  <Label text="PotPlayer 路径" styleClass="fs-big, bold" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
                                  <HBox alignment="CENTER_LEFT" spacing="10.0" GridPane.rowIndex="7" GridPane.columnIndex="1">
-                                    <TextField fx:id="potPlayerPathField" HBox.hgrow="ALWAYS" promptText="未配置自动检测,如果没有则用上方的内置播放器" />
+                                    <TextField fx:id="potPlayerPathField" HBox.hgrow="ALWAYS" promptText="可选" />
                                  </HBox>
 
                                  <Label text="%settings.usage" styleClass="setting-title-label" GridPane.rowIndex="8" GridPane.columnIndex="0"/>

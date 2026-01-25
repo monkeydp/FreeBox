@@ -187,50 +187,9 @@ public class VLCPlayer extends BasePlayer<ImageView> {
         return null;
     }
 
-    /**
-     * 执行播放逻辑
-     */
+
     @Override
     protected boolean doPlay(String url, Map<String, String> headers, String videoTitle, @Nullable Long progress) {
-        log.info("！！！进入 doPlay ！！！ 正在处理：{}", videoTitle);
-        log.info("当前播放地址: {}", url);
-
-        // --- 核心：只要是网络地址，优先尝试外调 PotPlayer 以获得最佳 2K/4K HDR 画质 ---
-        if (url != null && url.startsWith("http")) {
-            try {
-                File potExe = new File(getPotPlayerPath());
-                if (potExe.exists()) {
-                    String ua = (headers != null) ? headers.getOrDefault("User-Agent", "") : "";
-                    String ref = (headers != null) ? headers.getOrDefault("Referer", "") : "";
-
-                    log.info("检测到网络源，正在启动 PotPlayer...");
-
-                    // 构造 PotPlayer 命令行参数
-                    List<String> command = new ArrayList<>();
-                    command.add(getPotPlayerPath());
-                    command.add(url);
-                    if (!ua.isEmpty()) command.add("/user_agent=\"" + ua + "\"");
-                    if (!ref.isEmpty()) command.add("/referrer=\"" + ref + "\"");
-                    command.add("/title=\"" + videoTitle + "\"");
-
-                    ProcessBuilder pb = new ProcessBuilder(command);
-                    pb.start();
-
-                    log.info("！！！ PotPlayer 启动指令已发送成功 ！！！");
-
-                    // 既然已经外调，停止内置播放器渲染，防止抢占资源和报错
-                    stop();
-                    setLoading(false);
-                    return true;
-                } else {
-                    log.warn("未找到 PotPlayer 可执行文件，路径可能有误: {}", getPotPlayerPath());
-                }
-            } catch (Exception e) {
-                log.error("尝试启动 PotPlayer 时发生异常: {}", e.getMessage());
-            }
-        }
-
-        // --- 如果不满足外调条件或外调失败，则回退到内置 VLC 播放 ---
         if (!super.doPlay(url, headers, videoTitle, progress)) {
             return false;
         }
@@ -238,7 +197,7 @@ public class VLCPlayer extends BasePlayer<ImageView> {
         String[] options = parsePlayOptionsFromHeaders(headers);
         long playingResourceId = IdUtil.getSnowflakeNextId();
         this.playingResourceId.set(playingResourceId);
-        log.info("回退内置播放 - url={}, options={}", url, options);
+        log.info("开始内置播放 - url={}, options={}", url, options);
 
         playbackExecutor.execute(() -> {
             try {
@@ -246,14 +205,42 @@ public class VLCPlayer extends BasePlayer<ImageView> {
                 if (playingResourceId != this.playingResourceId.get()) {
                     return;
                 }
-                mediaPlayer.media()
-                           .play(url, options);
+                mediaPlayer.media().play(url, options);
             } finally {
                 playingResourceLock.unlock();
             }
         });
-
         return true;
+    }
+
+    // 2. 新增的外调方法（供按钮调用）
+    public void launchPotPlayer(String url, Map<String, String> headers, String title) {
+        if (StringUtils.isBlank(url)) return;
+        try {
+            File potExe = new File(getPotPlayerPath()); // 确保你有 getPotPlayerPath 方法
+            if (!potExe.exists()) {
+                log.warn("未找到 PotPlayer");
+                return;
+            }
+
+            // 组装参数
+            String ua = (headers != null) ? headers.getOrDefault("User-Agent", "") : "";
+            String ref = (headers != null) ? headers.getOrDefault("Referer", "") : "";
+            List<String> command = new ArrayList<>();
+            command.add(getPotPlayerPath());
+            command.add(url);
+            if (!ua.isEmpty()) command.add("/user_agent=\"" + ua + "\"");
+            if (!ref.isEmpty()) command.add("/referrer=\"" + ref + "\"");
+            command.add("/title=\"" + title + "\"");
+
+            // 启动外部播放
+            new ProcessBuilder(command).start();
+
+            // 停止内部播放
+            this.stop();
+        } catch (Exception e) {
+            log.error("外调 PotPlayer 失败", e);
+        }
     }
 
     /**
@@ -280,6 +267,7 @@ public class VLCPlayer extends BasePlayer<ImageView> {
                     "/user_agent=\"" + ua + "\"",
                     "/referrer=\"" + ref + "\""
             );
+            log.info("启动 PotPlayer 命令参数: {}", pb.command());
             pb.start();
             return true;
         } catch (Exception e) {
