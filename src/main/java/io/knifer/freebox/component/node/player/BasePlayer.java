@@ -161,6 +161,11 @@ public abstract class BasePlayer<T extends Node> {
     private Runnable fullScreenRunnable = BaseValues.EMPTY_RUNNABLE;
     private Runnable fullScreenExitRunnable = BaseValues.EMPTY_RUNNABLE;
 
+    /**
+     * PotPlayer 安装路径
+     */
+    private String potPlayerPath;
+
     public BasePlayer(Pane parent, Config config) {
         boolean liveMode = BooleanUtils.toBoolean(config.getLiveMode());
         boolean externalMode = BooleanUtils.toBoolean(config.getExternalMode());

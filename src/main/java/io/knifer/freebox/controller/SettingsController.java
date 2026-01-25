@@ -123,6 +123,8 @@ public class SettingsController {
     private Hyperlink playerSelectHyperlink;
     @FXML
     private ToggleGroup videoPlaybackTriggerToggleGroup;
+    @FXML
+    private TextField potPlayerPathField;
 
     private Stage stage;
 
@@ -299,6 +301,9 @@ public class SettingsController {
                         I18nHelper.get(I18nKeys.SETTINGS_PLAYER_STATUS_NOT_FOUND)
         );
         playerTypeComboBox.getSelectionModel().select(ConfigHelper.getPlayerType());
+
+        playerTypeComboBox.getSelectionModel().select(ConfigHelper.getPlayerType());
+        potPlayerPathField.setText(ConfigHelper.getPotPlayerPath());
     }
 
     private void setupToggleGroup(
@@ -365,6 +370,9 @@ public class SettingsController {
 
     @FXML
     private void onSaveBtnAction() {
+        ConfigHelper.setPotPlayerPath(potPlayerPathField.getText().trim());
+        ConfigHelper.markToUpdate();
+
         String usageFontFamily;
         List<Window> windows;
 

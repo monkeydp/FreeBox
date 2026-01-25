@@ -98,4 +98,9 @@ public class Config {
      * vlc播放器路径（vlcj NativeDiscovery失败时使用）
      */
     private String vlcPath;
+
+    /**
+     * PotPlayer 安装路径
+     */
+    private String potPlayerPath;
 }

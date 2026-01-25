@@ -279,15 +279,20 @@
                                     </HBox>
                                  </HBox>
 
-                                 <Label text="%settings.usage" styleClass="setting-title-label" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+                                 <Label text="PotPlayer 路径" styleClass="fs-big, bold" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+                                 <HBox alignment="CENTER_LEFT" spacing="10.0" GridPane.rowIndex="7" GridPane.columnIndex="1">
+                                    <TextField fx:id="potPlayerPathField" HBox.hgrow="ALWAYS" promptText="未配置自动检测,如果没有则用上方的内置播放器" />
+                                 </HBox>
 
-                                 <Label styleClass="fs-big, bold" text="%settings.font-family" GridPane.rowIndex="8" GridPane.columnIndex="0"/>
-                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="1">
+                                 <Label text="%settings.usage" styleClass="setting-title-label" GridPane.rowIndex="8" GridPane.columnIndex="0"/>
+
+                                 <Label styleClass="fs-big, bold" text="%settings.font-family" GridPane.rowIndex="9" GridPane.columnIndex="0"/>
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="9" GridPane.columnIndex="1">
                                     <SearchableComboBox fx:id="usageFontFamilyComboBox" onAction="#onUsageFontFamilyComboBoxAction" />
                                     <Label fx:id="usageFontFamilyExampleLabel" text="%settings.font-family-example" />
                                  </HBox>
 
-                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="9" GridPane.columnIndex="0">
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="10" GridPane.columnIndex="0">
                                     <Label styleClass="fs-big, bold" text="%settings.movie-playback-trigger"/>
                                     <Label styleClass="fs-big">
                                        <graphic>
@@ -299,7 +304,7 @@
                                        </tooltip>
                                     </Label>
                                  </HBox>
-                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="9" GridPane.columnIndex="1">
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="10" GridPane.columnIndex="1">
                                     <fx:define>
                                        <ToggleGroup fx:id="videoPlaybackTriggerToggleGroup"/>
                                     </fx:define>
@@ -319,10 +324,10 @@
                                     </RadioButton>
                                  </HBox>
 
-                                 <Label text="%settings.other" styleClass="setting-title-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
+                                 <Label text="%settings.other" styleClass="setting-title-label" GridPane.rowIndex="11" GridPane.columnIndex="0" />
 
-                                 <Label styleClass="fs-big, bold" text="%settings.license" GridPane.rowIndex="11" GridPane.columnIndex="0"/>
-                                 <Button text="%settings.show-license" onAction="#onShowLicenseButtonAction" mnemonicParsing="false" focusTraversable="false" GridPane.rowIndex="11" GridPane.columnIndex="1"/>
+                                 <Label styleClass="fs-big, bold" text="%settings.license" GridPane.rowIndex="12" GridPane.columnIndex="0"/>
+                                 <Button text="%settings.show-license" onAction="#onShowLicenseButtonAction" mnemonicParsing="false" focusTraversable="false" GridPane.rowIndex="12" GridPane.columnIndex="1"/>
                               </children>
                            </GridPane>
                         </VBox>
@@ -335,14 +340,14 @@
    </center>
    <bottom>
       <ButtonBar prefHeight="40.0" prefWidth="200.0" BorderPane.alignment="CENTER">
-        <buttons>
-          <Button fx:id="saveBtn" disable="true" mnemonicParsing="false" onAction="#onSaveBtnAction" text="%settings.save">
-             <graphic>
-                <FontIcon iconLiteral="fa-check:16:green" />
-             </graphic>
-          </Button>
+         <buttons>
+            <Button fx:id="saveBtn" disable="true" mnemonicParsing="false" onAction="#onSaveBtnAction" text="%settings.save">
+               <graphic>
+                  <FontIcon iconLiteral="fa-check:16:green" />
+               </graphic>
+            </Button>
             <Button mnemonicParsing="false" onAction="#onCancelBtnAction" text="%common.cancel" />
-        </buttons>
+         </buttons>
          <BorderPane.margin>
             <Insets left="20.0" right="20.0" />
          </BorderPane.margin>

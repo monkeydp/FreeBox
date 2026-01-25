@@ -30,6 +30,16 @@ public class ConfigHelper {
 
     private static final AtomicBoolean updateFlag = new AtomicBoolean(false);
 
+    public String getPotPlayerPath() {
+        assertIfConfigLoaded();
+        return config.getPotPlayerPath();
+    }
+
+    public synchronized void setPotPlayerPath(String potPlayerPath) {
+        assertIfConfigLoaded();
+        config.setPotPlayerPath(potPlayerPath);
+    }
+
     public synchronized void setServiceIPv4(String serviceIPv4) {
         assertIfConfigLoaded();
         config.setServiceIPv4(serviceIPv4);
