@@ -35,6 +35,30 @@ public class ConfigHelper {
         return config.getPotPlayerPath();
     }
 
+    /**
+     * 获取 PotPlayer 路径（包含自动探测）
+     */
+    public String findPotPlayerPath() {
+        // 1. 优先级最高：常规设置里的手动配置
+        String configPath = getPotPlayerPath();
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(configPath)) {
+            java.io.File f = new java.io.File(configPath);
+            if (f.exists()) return f.getAbsolutePath();
+        }
+
+        // 2. 优先级次之：多路径自动探测
+        String[] ps = {
+                "C:\\Program Files\\DAUM\\PotPlayer\\PotPlayerMini64.exe",
+                "C:\\Program Files (x86)\\DAUM\\PotPlayer\\PotPlayerMini64.exe",
+                "D:\\PotPlayer\\PotPlayerMini64.exe",
+                "D:\\app\\PotPlayer\\PotPlayerMini64.exe",
+        };
+        for (String p : ps) {
+            if (new java.io.File(p).exists()) return p;
+        }
+        return null;
+    }
+
     public synchronized void setPotPlayerPath(String potPlayerPath) {
         assertIfConfigLoaded();
         config.setPotPlayerPath(potPlayerPath);

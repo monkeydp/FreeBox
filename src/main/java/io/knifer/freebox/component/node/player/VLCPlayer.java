@@ -165,29 +165,6 @@ public class VLCPlayer extends BasePlayer<ImageView> {
         });
     }
 
-    private String getPotPlayerPath() {
-        // 1. 优先级最高：常规设置里的手动配置
-        String configPath = ConfigHelper.getPotPlayerPath();
-        if (StringUtils.isNotBlank(configPath)) {
-            File f = new File(configPath);
-            if (f.exists()) return f.getAbsolutePath();
-            else log.warn("手动配置的 PotPlayer 路径无效: {}", configPath);
-        }
-
-        // 2. 优先级次之：多路径自动探测
-        String[] ps = {
-                "C:\\Program Files\\DAUM\\PotPlayer\\PotPlayerMini64.exe",
-                "C:\\Program Files (x86)\\DAUM\\PotPlayer\\PotPlayerMini64.exe",
-                "D:\\PotPlayer\\PotPlayerMini64.exe",
-                "D:\\app\\PotPlayer\\PotPlayerMini64.exe",
-        };
-        for (String p : ps) {
-            if (new File(p).exists()) return p;
-        }
-        return null;
-    }
-
-
     @Override
     protected boolean doPlay(String url, Map<String, String> headers, String videoTitle, @Nullable Long progress) {
         if (!super.doPlay(url, headers, videoTitle, progress)) {
@@ -217,7 +194,12 @@ public class VLCPlayer extends BasePlayer<ImageView> {
     public void launchPotPlayer(String url, Map<String, String> headers, String title) {
         if (StringUtils.isBlank(url)) return;
         try {
-            File potExe = new File(getPotPlayerPath()); // 确保你有 getPotPlayerPath 方法
+            String potPath = ConfigHelper.findPotPlayerPath();
+            if (potPath == null) {
+                log.warn("未找到 PotPlayer");
+                return;
+            }
+            File potExe = new File(potPath);
             if (!potExe.exists()) {
                 log.warn("未找到 PotPlayer");
                 return;
@@ -227,7 +209,7 @@ public class VLCPlayer extends BasePlayer<ImageView> {
             String ua = (headers != null) ? headers.getOrDefault("User-Agent", "") : "";
             String ref = (headers != null) ? headers.getOrDefault("Referer", "") : "";
             List<String> command = new ArrayList<>();
-            command.add(getPotPlayerPath());
+            command.add(potPath);
             command.add(url);
             if (!ua.isEmpty()) command.add("/user_agent=\"" + ua + "\"");
             if (!ref.isEmpty()) command.add("/referrer=\"" + ref + "\"");
@@ -248,9 +230,14 @@ public class VLCPlayer extends BasePlayer<ImageView> {
      */
     private boolean tryPlayInPotPlayer(String url, Map<String, String> headers) {
         try {
-            File potExe = new File(getPotPlayerPath());
+            String potPath = ConfigHelper.findPotPlayerPath();
+            if (potPath == null) {
+                log.warn("未找到 PotPlayer 路径, 请检查配置");
+                return false;
+            }
+            File potExe = new File(potPath);
             if (!potExe.exists()) {
-                log.warn("未找到 PotPlayer 路径: {}, 请检查配置", getPotPlayerPath());
+                log.warn("未找到 PotPlayer 路径: {}, 请检查配置", potPath);
                 return false;
             }
 
@@ -262,7 +249,7 @@ public class VLCPlayer extends BasePlayer<ImageView> {
             }
 
             ProcessBuilder pb = new ProcessBuilder(
-                    getPotPlayerPath(),
+                    potPath,
                     url,
                     "/user_agent=\"" + ua + "\"",
                     "/referrer=\"" + ref + "\""
