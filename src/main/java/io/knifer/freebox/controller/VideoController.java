@@ -83,6 +83,26 @@ import java.util.function.Consumer;
 @Slf4j
 public class VideoController extends BaseController implements Destroyable {
 
+    private String safeEncodeUrl(String url) {
+        if (url == null) return null;
+        try {
+            // 使用 URI 类来自动编码非 ASCII 字符（如中文），同时保留 :// 等结构
+            // 注意：URI 构造器可能会抛出异常如果 URL 格式非常不标准
+            // 先尝试整体转换，如果不行再手动处理
+            String encoded = url.replace(" ", "%20"); // 简单处理空格
+            // 匹配中文字符进行编码
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("[\\u4e00-\\u9fa5]+").matcher(encoded);
+            StringBuilder sb = new StringBuilder();
+            while (matcher.find()) {
+                matcher.appendReplacement(sb, URLEncoder.encode(matcher.group(), StandardCharsets.UTF_8));
+            }
+            matcher.appendTail(sb);
+            return sb.toString();
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
     @FXML
     private Button openInPotPlayerBtn;
 
@@ -541,7 +561,10 @@ public class VideoController extends BaseController implements Destroyable {
                                 // 处理m3u8广告过滤、ts代理
                                 filterAdAndProxy(playUrl, headers, isAdFilteredAndProxyUrl -> {
                                     Boolean isAdFiltered = isAdFilteredAndProxyUrl.getLeft();
-                                    String proxyUrl = isAdFilteredAndProxyUrl.getRight();
+                                    String rawProxyUrl = isAdFilteredAndProxyUrl.getRight();
+                                    // 确保代理链接是经过 URL 编码的（处理中文路径）
+                                    String proxyUrl = safeEncodeUrl(rawProxyUrl);
+                                    
                                     TVPlayBO tvPlayBO = TVPlayBO.of(
                                             proxyUrl,
                                             headers,
@@ -559,24 +582,29 @@ public class VideoController extends BaseController implements Destroyable {
                                         // ------------------------------------
 
                                         // 更新详细信息 Tooltip
-                                        updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, proxyUrl, proxyUrl, headers, videoTitle);
+                                        // 注意：playUrl 保持原始（未解码或源接口返回的状态），proxyUrl 是已编码的
+                                        updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, proxyUrl, headers, videoTitle);
 
                                         player.play(tvPlayBO);
                                     });
                                 });
                             } else {
                                 // --- 【新增代码：情况2】记录原始URL ---
-                                this.currentPlayUrl = playUrl;
+                                // 如果没有代理，playUrl 也可能包含中文，需要确保编码
+                                String encodedPlayUrl = safeEncodeUrl(playUrl);
+                                
+                                this.currentPlayUrl = encodedPlayUrl;
                                 this.currentPlayHeaders = headers;
                                 this.currentVideoTitle = videoTitle;
                                 if (openInPotPlayerBtn != null) openInPotPlayerBtn.setDisable(false);
                                 // ------------------------------------
 
                                 // 更新详细信息 Tooltip
-                                updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, playUrl, headers, videoTitle);
+                                // 传入编码后的 playUrl 替代 proxyUrl 位置，确保 PotPlayer 拿到的是编码后的
+                                updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, encodedPlayUrl, headers, videoTitle);
 
                                 player.play(TVPlayBO.of(
-                                        playUrl, headers, videoTitle, progress, false
+                                        encodedPlayUrl, headers, videoTitle, progress, false
                                 ));
                             }
                         } else {
