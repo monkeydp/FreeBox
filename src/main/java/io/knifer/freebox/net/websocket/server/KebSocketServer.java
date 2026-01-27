@@ -1,5 +1,7 @@
 package io.knifer.freebox.net.websocket.server;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.knifer.freebox.constant.AppEvents;
 import io.knifer.freebox.constant.I18nKeys;
 import io.knifer.freebox.context.Context;
@@ -66,6 +68,27 @@ public class KebSocketServer extends WebSocketServer {
 	@Override
 	public void onMessage(WebSocket conn, String message) {
         log.info("received message from {}: {}", conn.getRemoteSocketAddress(), message);
+        
+        // --- 全局拦截错误消息 (针对回调丢失的情况进行兜底提示) ---
+        try {
+            // 快速过滤：只处理包含 code:210 (播放响应) 且包含 msg 字段的消息
+            if (message.contains("\"code\":210") && message.contains("\"msg\":")) {
+                JsonObject json = JsonParser.parseString(message).getAsJsonObject();
+                if (json.has("data") && json.get("data").isJsonObject()) {
+                    JsonObject data = json.getAsJsonObject("data");
+                    if (data.has("msg")) {
+                        String msg = data.get("msg").getAsString();
+                        if (StringUtils.isNotBlank(msg)) {
+                            Platform.runLater(() -> ToastHelper.showError(msg));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 忽略解析错误，不影响正常流程
+        }
+        // ----------------------------------------------------
+        
 		messageDispatcher.dispatch(message, conn);
 	}
 
