@@ -267,9 +267,8 @@ public class VideoController extends BaseController implements Destroyable {
 
                 // --- 初始化 Tooltip (包裹在 try-catch 中以防阻断渲染) ---
                 try {
-                    StringBuilder initialInfo = new StringBuilder();
                     String rawUrl = bean.getUrl();
-                    
+
                     // 清洗 URL
                     if (rawUrl != null) {
                         rawUrl = rawUrl.trim();
@@ -277,100 +276,11 @@ public class VideoController extends BaseController implements Destroyable {
                         if (rawUrl.endsWith("`")) rawUrl = rawUrl.substring(0, rawUrl.length() - 1);
                         rawUrl = rawUrl.trim();
                     }
-                    
-                    initialInfo.append("【原始链接】 ");
-                    
-                    // 尝试解析并格式化 JSON
-                    boolean isJson = false;
-                    try {
-                        if (rawUrl != null) {
-                            JsonElement jsonElement = JsonParser.parseString(rawUrl);
-                            if (jsonElement.isJsonObject() || jsonElement.isJsonArray()) {
-                                String prettyJson = new GsonBuilder().setPrettyPrinting().create().toJson(jsonElement);
-                                initialInfo.append("\n").append(prettyJson);
-                                isJson = true;
-                            }
-                        }
-                    } catch (Exception e) {
-                        // 不是 JSON，忽略
-                    }
 
-                    if (!isJson) {
-                        initialInfo.append("【链接】\n");
-                        // 1. 第一行：显示编码后的链接（实际播放用）
-                        String encodedUrl = rawUrl;
-                        try {
-                            if (rawUrl != null) {
-                                encodedUrl = URLEncoder.encode(rawUrl, StandardCharsets.UTF_8)
-                                        .replaceAll("\\+", "%20")
-                                        .replaceAll("%3A", ":")
-                                        .replaceAll("%2F", "/");
-                            }
-                        } catch (Exception e) {}
-                        initialInfo.append(encodedUrl).append("\n\n");
-
-                        // 2. 第二行：显示解码后的链接（可读）
-                        try {
-                            if (rawUrl != null) {
-                                String decoded = URLDecoder.decode(rawUrl, StandardCharsets.UTF_8);
-                                initialInfo.append(decoded);
-                            }
-                        } catch (Exception e) {
-                            initialInfo.append(rawUrl);
-                        }
-                    }
-                    
-                    String tooltipText = initialInfo.toString();
-                    
-                    // 更新全局调试信息
-                    this.currentDebugInfo = tooltipText;
-                    
-                    Tooltip tooltip = new Tooltip(tooltipText);
-                    tooltip.setWrapText(true);
-                    tooltip.setPrefWidth(600);
-                    // 增加微小延迟以防止闪烁
-                    tooltip.setShowDelay(javafx.util.Duration.millis(200));
-                    tooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
-                    tooltip.setStyle("-fx-font-size: 14px;");
-                    
-                    // --- 关键修复：强制 Tooltip 显示在当前屏幕的最左侧 ---
-                    tooltip.setOnShowing(ev -> {
-                        if (root.getScene() != null && root.getScene().getWindow() != null) {
-                            // 获取当前窗口
-                            javafx.stage.Window window = root.getScene().getWindow();
-                            // 获取窗口所在的屏幕
-                            List<Screen> screens = Screen.getScreensForRectangle(
-                                    window.getX(), window.getY(), window.getWidth(), window.getHeight()
-                            );
-                            Screen screen = screens.isEmpty() ? Screen.getPrimary() : screens.get(0);
-                            Rectangle2D bounds = screen.getVisualBounds();
-                            
-                            // 强制设置 Tooltip X 坐标为屏幕左边界 + 20px
-                            tooltip.setX(bounds.getMinX() + 20);
-                            // Y 坐标：如果不想让它太靠下，可以稍微限制一下，或者让它跟随鼠标高度但靠左
-                            // 为了稳妥，这里只强制 X，让 JavaFX 自己决定 Y（通常是垂直居中于目标或跟随鼠标Y）
-                        }
-                    });
-                    // -------------------------------------------------------------
-                    
-                    btn.setTooltip(tooltip);
-                    
-                    // --- 添加右键复制功能 ---
-                    ContextMenu contextMenu = new ContextMenu();
-                    MenuItem copyItem = new MenuItem("复制链接信息");
-                    copyItem.setOnAction(e -> {
-                        ClipboardContent content = new ClipboardContent();
-                        // 始终读取最新的 currentDebugInfo
-                        String textToCopy = this.currentDebugInfo != null ? this.currentDebugInfo : "";
-                        content.putString(textToCopy);
-                        Clipboard.getSystemClipboard().setContent(content);
-                        ToastHelper.showInfo("已复制到剪贴板");
-                    });
-                    contextMenu.getItems().add(copyItem);
-                    btn.setContextMenu(contextMenu);
+                    // 使用 updateInfo 设置初始状态 (只显示视频信息)
+                    updateInfo(btn, rawUrl, null, null, null, null, null);
                 } catch (Exception e) {
-                    // 忽略 Tooltip 初始化错误，确保按钮能正常添加到界面
-                    System.err.println("Tooltip init failed: " + e.getMessage());
+                    log.warn("init tooltip failed", e);
                 }
                 // ----------------------------------------------------
 
@@ -647,7 +557,7 @@ public class VideoController extends BaseController implements Destroyable {
                                         // ------------------------------------
 
                                         // 更新详细信息 Tooltip
-                                        setTooltipForPlayer(proxyUrl, headers, videoTitle, playerContentJson);
+                                        updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, proxyUrl, proxyUrl, headers, videoTitle);
 
                                         player.play(tvPlayBO);
                                     });
@@ -661,7 +571,7 @@ public class VideoController extends BaseController implements Destroyable {
                                 // ------------------------------------
 
                                 // 更新详细信息 Tooltip
-                                setTooltipForPlayer(playUrl, headers, videoTitle, playerContentJson);
+                                updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, playUrl, headers, videoTitle);
 
                                 player.play(TVPlayBO.of(
                                         playUrl, headers, videoTitle, progress, false
@@ -881,106 +791,227 @@ public class VideoController extends BaseController implements Destroyable {
         }
     }
 
-    private void setTooltipForPlayer(String playUrl, Map<String, String> headers, String videoTitle, JsonObject playerContentJson) {
-        // --- 关键修复：清洗 URL，去除首尾可能存在的反引号和空格 ---
-        if (playUrl != null) {
-            playUrl = playUrl.trim();
-            if (playUrl.startsWith("`")) playUrl = playUrl.substring(1);
-            if (playUrl.endsWith("`")) playUrl = playUrl.substring(0, playUrl.length() - 1);
-            playUrl = playUrl.trim(); // 再次去除可能残留的空格
-        }
-        // ----------------------------------------------------
+    private void updateInfo(
+            Button btn,
+            String rawUrl,
+            JsonObject playerContentJson,
+            String playUrl,
+            String proxyUrl,
+            Map<String, String> headers,
+            String videoTitle
+    ) {
+        // 构建用于显示的文本（缩短 URL）
+        String displayText = buildInfoContent(rawUrl, playerContentJson, playUrl, proxyUrl, headers, videoTitle, true);
+        // 构建用于复制的文本（完整 URL）
+        String copyText = buildInfoContent(rawUrl, playerContentJson, playUrl, proxyUrl, headers, videoTitle, false);
 
-        StringBuilder infoSb = new StringBuilder();
-
-        // 1. 格式化原链 JSON
-        infoSb.append("【原链】(源配置信息)\n");
-        try {
-            String prettyJson = new GsonBuilder().setPrettyPrinting().create().toJson(playerContentJson);
-            infoSb.append(prettyJson);
-        } catch (Exception e) {
-            infoSb.append(playerContentJson);
-        }
-        infoSb.append("\n\n");
-
-        // 2. 中转链（仅当它与原链的JSON字符串不同时显示，通常都不同，所以保留）
-        infoSb.append("【中转链】\n");
-        // 第一行：编码后的（实际播放用的）
-        String encodedPlayUrl = playUrl;
-        try {
-             encodedPlayUrl = URLEncoder.encode(playUrl, StandardCharsets.UTF_8)
-                    .replaceAll("\\+", "%20")
-                    .replaceAll("%3A", ":")
-                    .replaceAll("%2F", "/");
-        } catch (Exception e) {}
-        infoSb.append(encodedPlayUrl).append("\n\n");
-
-        // 第二行：解码后的（可读的）
-        try {
-            String decoded = URLDecoder.decode(playUrl, StandardCharsets.UTF_8);
-            infoSb.append(decoded);
-        } catch (Exception e) {
-            infoSb.append(playUrl);
-        }
-        infoSb.append("\n\n");
-
-        infoSb.append("【Headers】\n").append(headers).append("\n\n");
-
-        infoSb.append("【PotPlayer命令】\n");
-        String potPath = ConfigHelper.findPotPlayerPath();
-        if (potPath == null) potPath = "PotPlayerMini64.exe";
-        String ua = headers.getOrDefault("User-Agent", "");
-        String ref = headers.getOrDefault("Referer", "");
-
-        // 构建 PowerShell 友好的命令
-        // 使用调用操作符 & 让 PowerShell 能够执行带空格路径的 exe
-        StringBuilder cmdSb = new StringBuilder("& ");
-
-        cmdSb.append("\"").append(potPath).append("\" \"").append(encodedPlayUrl).append("\"");
-
-        if (!ua.isEmpty()) cmdSb.append(" /user_agent=\"").append(ua).append("\"");
-        if (!ref.isEmpty()) cmdSb.append(" /referrer=\"").append(ref).append("\"");
-
-        // 处理标题中的双引号，防止破坏命令行结构
-        String safeTitle = videoTitle.replace("\"", "\\\"");
-        cmdSb.append(" /title=\"").append(safeTitle).append("\"");
-
-        String cmd = cmdSb.toString();
-        infoSb.append(cmd);
-
-        String tooltipText = infoSb.toString();
+        // 设置 Tooltip
+        Tooltip tooltip = new Tooltip(displayText);
+        tooltip.setWrapText(true);
+        tooltip.setPrefWidth(600);
+        tooltip.setShowDelay(javafx.util.Duration.millis(200));
+        tooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
+        tooltip.setStyle("-fx-font-size: 14px;");
         
-        // 更新全局调试信息，确保右键复制能取到最新内容
-        this.currentDebugInfo = tooltipText;
+        // 强制左侧显示
+        tooltip.setOnShowing(ev -> {
+            if (root.getScene() != null && root.getScene().getWindow() != null) {
+                javafx.stage.Window window = root.getScene().getWindow();
+                List<Screen> screens = Screen.getScreensForRectangle(
+                        window.getX(), window.getY(), window.getWidth(), window.getHeight()
+                );
+                Screen screen = screens.isEmpty() ? Screen.getPrimary() : screens.get(0);
+                Rectangle2D bounds = screen.getVisualBounds();
+                tooltip.setX(bounds.getMinX() + 20);
+            }
+        });
 
-        // 1. 设置到播放器标题
-        player.setVideoTitleTooltip(tooltipText);
-
-        // 2. 设置到当前选中的“选集按钮”上
-        if (selectedEpBtn != null) {
-            Tooltip epTooltip = new Tooltip(tooltipText);
-            epTooltip.setWrapText(true);
-            epTooltip.setPrefWidth(800);
-            // 增加微小延迟以防止闪烁
-            epTooltip.setShowDelay(javafx.util.Duration.millis(200));
-            epTooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
-            epTooltip.setStyle("-fx-font-size: 14px;");
+        if (btn != null) {
+            btn.setTooltip(tooltip);
             
-            // --- 强制左侧显示 ---
-            epTooltip.setOnShowing(ev -> {
-                if (root.getScene() != null && root.getScene().getWindow() != null) {
-                    javafx.stage.Window window = root.getScene().getWindow();
-                    List<Screen> screens = Screen.getScreensForRectangle(
-                            window.getX(), window.getY(), window.getWidth(), window.getHeight()
-                    );
-                    Screen screen = screens.isEmpty() ? Screen.getPrimary() : screens.get(0);
-                    Rectangle2D bounds = screen.getVisualBounds();
-                    epTooltip.setX(bounds.getMinX() + 20);
-                }
+            // 更新右键菜单 (确保每个按钮有独立的复制内容)
+            ContextMenu contextMenu = btn.getContextMenu();
+            if (contextMenu == null) {
+                contextMenu = new ContextMenu();
+                btn.setContextMenu(contextMenu);
+            }
+            // 清除旧的“复制链接信息”项
+            contextMenu.getItems().removeIf(item -> "复制链接信息".equals(item.getText()));
+            MenuItem copyItem = new MenuItem("复制链接信息");
+            copyItem.setOnAction(e -> {
+                Platform.runLater(() -> {
+                    try {
+                        ClipboardContent content = new ClipboardContent();
+                        content.putString(copyText);
+                        Clipboard.getSystemClipboard().setContent(content);
+                        ToastHelper.showInfo("已复制到剪贴板");
+                    } catch (Exception ex) {
+                        log.warn("Clipboard copy failed", ex);
+                        ToastHelper.showError("复制失败，请重试");
+                    }
+                });
             });
-            // -------------------
+            contextMenu.getItems().add(copyItem);
+        }
+        
+        // 如果正在播放且是当前选中按钮，也更新播放器的 Tooltip (作为全局调试信息备份)
+        if (player != null && btn == selectedEpBtn) {
+            player.setVideoTitleTooltip(displayText);
+            this.currentDebugInfo = copyText; // 兼容旧逻辑
+        }
+    }
+
+    private String buildInfoContent(
+            String rawUrl,
+            JsonObject playerContentJson,
+            String playUrl,
+            String proxyUrl,
+            Map<String, String> headers,
+            String videoTitle,
+            boolean forDisplay
+    ) {
+        // 清洗数据
+        rawUrl = cleanUrl(rawUrl);
+        playUrl = cleanUrl(playUrl);
+        proxyUrl = cleanUrl(proxyUrl);
+
+        StringBuilder sb = new StringBuilder();
+
+        // 1. 【视频信息】 (对应图1：选集列表原始值)
+        sb.append("【视频信息】\n");
+        if (StringUtils.isNotBlank(rawUrl)) {
+            try {
+                JsonElement el = JsonParser.parseString(rawUrl);
+                if (el.isJsonObject() || el.isJsonArray()) {
+                    sb.append(formatAndShortenJson(el, forDisplay));
+                } else {
+                    sb.append(processUrlStr(rawUrl, forDisplay));
+                }
+            } catch (Exception e) {
+                sb.append(processUrlStr(rawUrl, forDisplay));
+            }
+        } else {
+            sb.append("无");
+        }
+        sb.append("\n\n");
+
+        // 2. 【解析详情】 (对应图2第一部分：接口返回的完整JSON)
+        if (playerContentJson != null) {
+            sb.append("【解析详情】\n");
+            // 对整个 JSON 对象进行深拷贝清洗和缩短
+            sb.append(formatAndShortenJson(playerContentJson, forDisplay));
+            sb.append("\n\n");
+        }
+
+        // 3. 【中转链】
+        if (StringUtils.isNotBlank(proxyUrl)) {
+            sb.append("【中转链】\n");
+            // 第一行：原始（编码后）的链接
+            sb.append(processUrlStr(proxyUrl, forDisplay)).append("\n");
             
-            selectedEpBtn.setTooltip(epTooltip);
+            // 尝试解码
+            try {
+                String decodedUrl = URLDecoder.decode(proxyUrl, StandardCharsets.UTF_8);
+                decodedUrl = cleanUrl(decodedUrl); 
+                
+                // 只有当解码后的链接与原始链接确实不同时，才显示第二行
+                // 比较时移除所有空白字符，防止因换行等不可见字符导致误判
+                String cleanProxy = proxyUrl.replaceAll("\\s+", "");
+                String cleanDecoded = decodedUrl.replaceAll("\\s+", "");
+                
+                if (StringUtils.isNotBlank(decodedUrl) && !cleanProxy.equalsIgnoreCase(cleanDecoded)) {
+                    sb.append("\n");
+                    sb.append(processUrlStr(decodedUrl, forDisplay)).append("\n");
+                }
+            } catch (Exception ignored) {
+            }
+            sb.append("\n");
+        }
+        
+        // 5. 【PotPlayer】
+        // 确定最终用于播放的 URL (优先使用中转链，没有则用解析链接)
+        String finalPlayUrl = StringUtils.isNotBlank(proxyUrl) ? proxyUrl : playUrl;
+        
+        if (StringUtils.isNotBlank(finalPlayUrl)) {
+             sb.append("【PotPlayer】\n");
+             String potPath = ConfigHelper.findPotPlayerPath();
+             if (potPath == null) potPath = "PotPlayerMini64.exe";
+             
+             String urlForCmd = forDisplay ? shortenUrl(finalPlayUrl) : finalPlayUrl;
+             
+             StringBuilder cmdSb = new StringBuilder("& ");
+             cmdSb.append("\"").append(potPath).append("\" \"");
+             cmdSb.append(urlForCmd).append("\"");
+             
+             if (headers != null) {
+                 String ua = headers.getOrDefault("User-Agent", "");
+                 String ref = headers.getOrDefault("Referer", "");
+                 if (!ua.isEmpty()) cmdSb.append(" /user_agent=\"").append(ua).append("\"");
+                 if (!ref.isEmpty()) cmdSb.append(" /referrer=\"").append(ref).append("\"");
+             }
+             
+             if (StringUtils.isNotBlank(videoTitle)) {
+                 String safeTitle = videoTitle.replace("\"", "\\\"");
+                 cmdSb.append(" /title=\"").append(safeTitle).append("\"");
+             }
+             
+             sb.append(cmdSb.toString());
+        }
+
+        return sb.toString();
+    }
+    
+    private String cleanUrl(String url) {
+        if (url == null) return null;
+        // 去除反引号和首尾空白
+        return url.replace("`", "").trim();
+    }
+    
+    private String processUrlStr(String url, boolean forDisplay) {
+        if (!forDisplay) return url;
+        return shortenUrl(url);
+    }
+
+    private String shortenUrl(String url) {
+        if (url == null || url.length() <= 100) return url;
+        return url.substring(0, 60) + "..." + url.substring(url.length() - 30);
+    }
+
+    private String formatAndShortenJson(JsonElement el, boolean forDisplay) {
+        // 无论是显示还是复制，都建议清洗一下反引号（除非用户想保留反引号，但通常那是脏数据）
+        // 这里我们对 JSON 数据进行深拷贝处理
+        el = el.deepCopy();
+        processJsonValues(el, forDisplay);
+        return GsonUtil.toPrettyJson(el);
+    }
+
+    private void processJsonValues(JsonElement el, boolean forDisplay) {
+        if (el.isJsonObject()) {
+            JsonObject obj = el.getAsJsonObject();
+            for (Map.Entry<String, JsonElement> entry : obj.entrySet()) {
+                JsonElement val = entry.getValue();
+                if (val.isJsonPrimitive() && val.getAsJsonPrimitive().isString()) {
+                    String str = val.getAsString();
+                    // 1. 清洗反引号
+                    String cleaned = cleanUrl(str);
+                    
+                    // 2. 如果是显示模式且超长，则缩短
+                    if (forDisplay && cleaned.length() > 100 && (cleaned.startsWith("http") || cleaned.contains("://"))) {
+                        cleaned = shortenUrl(cleaned);
+                    }
+                    
+                    // 更新值
+                    if (!str.equals(cleaned)) {
+                        entry.setValue(new com.google.gson.JsonPrimitive(cleaned));
+                    }
+                } else if (val.isJsonObject() || val.isJsonArray()) {
+                    processJsonValues(val, forDisplay);
+                }
+            }
+        } else if (el.isJsonArray()) {
+            for (JsonElement item : el.getAsJsonArray()) {
+                processJsonValues(item, forDisplay);
+            }
         }
     }
 }
