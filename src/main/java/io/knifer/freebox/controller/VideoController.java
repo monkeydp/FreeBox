@@ -492,11 +492,7 @@ public class VideoController extends BaseController implements Destroyable {
     ) {
         String flag = urlInfo.getFlag();
         String playUrl = urlInfoBean.getUrl();
-        String sourceKey = videoDetail.getSourceKey();
-        List<String> vipParseFlags =
-                videoDetail.getVipParseFlags() == null ?
-                        List.of() :
-                        videoDetail.getVipParseFlags();
+        String sourceKey = video.getSourceKey();
 
         if (this.player != null) {
             this.player.stop();
@@ -511,11 +507,13 @@ public class VideoController extends BaseController implements Destroyable {
         }
         
         template.getPlayerContent(
-                GetPlayerContentDTO.of(sourceKey, flag, playUrl, vipParseFlags),
+                GetPlayerContentDTO.of(sourceKey, flag, playUrl),
                 playerContentJson -> {
                     Platform.runLater(() -> {
                         JsonElement propsElm;
                         JsonObject propsObj;
+                        JsonElement elm;
+                        String finalPlayUrlStr;
                         int parse;
                         int jx;
                         Map<String, String> headers;
@@ -550,8 +548,8 @@ public class VideoController extends BaseController implements Destroyable {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
                             return;
                         }
-                        playUrl = elm.getAsString();
-                        if (StringUtils.isBlank(playUrl)) {
+                        finalPlayUrlStr = elm.getAsString();
+                        if (StringUtils.isBlank(finalPlayUrlStr)) {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
                             return;
                         }
@@ -559,15 +557,15 @@ public class VideoController extends BaseController implements Destroyable {
                         // playUrl = URLDecoder.decode(playUrl, Charsets.UTF_8);
                         
                         // --- 关键修复：在源头清洗 URL，确保播放和显示都使用干净的链接 ---
-                        if (playUrl != null) {
-                            playUrl = playUrl.trim();
-                            if (playUrl.startsWith("`")) playUrl = playUrl.substring(1);
-                            if (playUrl.endsWith("`")) playUrl = playUrl.substring(0, playUrl.length() - 1);
-                            playUrl = playUrl.trim();
+                        if (finalPlayUrlStr != null) {
+                            finalPlayUrlStr = finalPlayUrlStr.trim();
+                            if (finalPlayUrlStr.startsWith("`")) finalPlayUrlStr = finalPlayUrlStr.substring(1);
+                            if (finalPlayUrlStr.endsWith("`")) finalPlayUrlStr = finalPlayUrlStr.substring(0, finalPlayUrlStr.length() - 1);
+                            finalPlayUrlStr = finalPlayUrlStr.trim();
                             
                             // 同时更新 JSON 对象里的 URL，确保 Tooltip 显示的 JSON 也是干净的
                             if (propsObj != null && propsObj.has("url")) {
-                                propsObj.addProperty("url", playUrl);
+                                propsObj.addProperty("url", finalPlayUrlStr);
                             }
                         }
                         // -----------------------------------------------------------
@@ -586,7 +584,7 @@ public class VideoController extends BaseController implements Destroyable {
                         }
                         videoTitle = "《" + video.getName() + "》" + flag + " - " + urlInfoBean.getName();
                         
-                        final String finalPlayUrl = playUrl;
+                        final String finalPlayUrl = finalPlayUrlStr;
                         final Map<String, String> finalHeaders = headers;
                         final String finalVideoTitle = videoTitle;
                         
