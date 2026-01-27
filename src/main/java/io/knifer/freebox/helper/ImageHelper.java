@@ -42,11 +42,12 @@ import java.util.concurrent.TimeUnit;
 @UtilityClass
 public class ImageHelper {
 
-    private static final String PROXY_CDN_URL = "https://wsrv.nl/?output=png&url=";
+    private static final String PROXY_CDN_URL = "https://wsrv.nl/?url=";
     private static final ImageLoadingResult DEFAULT_RESULT =
             ImageLoadingResult.of(BaseResources.PICTURE_PLACEHOLDER_IMG, false);
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
+            .proxy(java.net.Proxy.NO_PROXY) // 不使用代理
             .build();
     private static final Map<String, String> DEFAULT_HEADERS = Map.of(
             HttpHeaders.USER_AGENT, BaseValues.USER_AGENT

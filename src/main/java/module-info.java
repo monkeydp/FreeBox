@@ -1,6 +1,7 @@
 module io.knifer.freebox {
     requires java.sql;
     requires java.desktop;
+    requires java.management;
     requires java.net.http;
     requires jdk.httpserver;
 

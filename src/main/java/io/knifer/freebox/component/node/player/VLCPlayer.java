@@ -55,9 +55,21 @@ public class VLCPlayer extends BasePlayer<ImageView> {
 
         Stage stage = WindowHelper.getStage(parent);
         MediaPlayerFactory mediaPlayerFactory;
+        List<String> factoryArgs = new ArrayList<>();
 
-        mediaPlayerFactory = SystemHelper.isDebug() ?
-                new MediaPlayerFactory(List.of("-vvv")) : new MediaPlayerFactory();
+        if (SystemHelper.isDebug()) {
+            factoryArgs.add("-vvv");
+        }
+
+        // 自动应用系统代理设置 (JVM properties) 到 VLC
+        String proxyHost = System.getProperty("http.proxyHost");
+        String proxyPort = System.getProperty("http.proxyPort");
+        if (StringUtils.isNotBlank(proxyHost) && StringUtils.isNotBlank(proxyPort)) {
+            factoryArgs.add("--http-proxy=" + proxyHost + ":" + proxyPort);
+            log.info("VLCPlayer using proxy: {}:{}", proxyHost, proxyPort);
+        }
+
+        mediaPlayerFactory = new MediaPlayerFactory(factoryArgs);
         mediaPlayer = mediaPlayerFactory.mediaPlayers()
                                         .newEmbeddedMediaPlayer();
         mediaPlayer.fullScreen()

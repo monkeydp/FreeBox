@@ -54,6 +54,7 @@ import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.MutableTriple;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
+import org.controlsfx.control.PopOver;
 import org.controlsfx.control.ToggleSwitch;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -94,6 +95,7 @@ public abstract class BasePlayer<T extends Node> {
     private final AnchorPane toastAnchorPane;
     private final PlayerToastPane toastPane;
     private final AnchorPane controlPane;
+    private final AnchorPane controlTopAnchorPane;
     private final Timer controlPaneHideTimer = new Timer(2000, evt -> setControlsVisible(false));
     private final ProgressIndicator loadingProgressIndicator;
     private final Label loadingProgressLabel;
@@ -146,6 +148,8 @@ public abstract class BasePlayer<T extends Node> {
     private final BooleanProperty isError = new SimpleBooleanProperty(false);
     private final SimpleStringProperty epgServiceUrlProperty = new SimpleStringProperty();
 
+    private PopOver videoInfoPopOver;
+
     private final DoubleBinding paneWidthProp;
 
     protected volatile boolean destroyFlag = false;
@@ -193,7 +197,7 @@ public abstract class BasePlayer<T extends Node> {
         HBox rightToolBarHbox;
         AnchorPane controlBottomAnchorPane;
         StackPane progressMiddleStackPane;
-        AnchorPane controlTopAnchorPane;
+        // AnchorPane controlTopAnchorPane;
 
         this.parent = parent;
         this.config = config;
@@ -689,7 +693,7 @@ public abstract class BasePlayer<T extends Node> {
         }
         // 鼠标移动事件处理
         parent.addEventHandler(MouseEvent.MOUSE_MOVED, evt -> setControlsVisible(true));
-        controlPane.addEventFilter(MouseEvent.MOUSE_MOVED, Event::consume);
+        // controlPane.addEventFilter(MouseEvent.MOUSE_MOVED, Event::consume);
         controlTopAnchorPane.addEventFilter(MouseEvent.MOUSE_ENTERED, controlsOnMouseEnteredEventHandler);
         controlTopAnchorPane.addEventFilter(MouseEvent.MOUSE_EXITED, controlsOnMouseExitedEventHandler);
         controlBottomAnchorPane.addEventFilter(MouseEvent.MOUSE_ENTERED, controlsOnMouseEnteredEventHandler);
@@ -1234,6 +1238,37 @@ public abstract class BasePlayer<T extends Node> {
 
     public void setVideoTitle(String videoTitle) {
         videoTitleLabel.setText(videoTitle);
+    }
+
+    public void setVideoTitleTooltip(String tooltipText) {
+        // 先移除旧的 Tooltip（如果有）
+        videoTitleLabel.setTooltip(null);
+        if (controlTopAnchorPane != null) {
+            Tooltip.install(controlTopAnchorPane, null);
+        }
+
+        if (StringUtils.isBlank(tooltipText)) {
+            return;
+        }
+
+        // 创建新的 Tooltip
+        Tooltip tooltip = new Tooltip(tooltipText);
+        tooltip.setWrapText(true);
+        tooltip.setPrefWidth(800);
+        // 关键设置：零延迟显示，无限时长
+        tooltip.setShowDelay(javafx.util.Duration.ZERO);
+        tooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
+        
+        // 样式类，确保可见性
+        tooltip.setStyle("-fx-font-size: 14px;");
+
+        // 绑定到 Label
+        videoTitleLabel.setTooltip(tooltip);
+        
+        // 双重保险：同时绑定到顶部控制栏（父容器），解决事件穿透问题
+        if (controlTopAnchorPane != null) {
+             Tooltip.install(controlTopAnchorPane, tooltip);
+        }
     }
 
     public void showToast(String message) {

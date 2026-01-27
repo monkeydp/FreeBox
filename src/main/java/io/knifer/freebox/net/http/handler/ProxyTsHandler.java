@@ -15,6 +15,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import io.knifer.freebox.constant.CacheKeys;
+import io.knifer.freebox.helper.CacheHelper;
+import java.util.List;
+import java.util.Map;
+
 /**
  * ts分片代理
  * 用于ts分片有非标准文件头的情况
@@ -39,28 +44,39 @@ public class ProxyTsHandler implements HttpHandler {
         try (httpExchange) {
             httpExchange.getResponseHeaders().add(HttpHeaders.CONTENT_TYPE, "video/MP2T");
             httpExchange.sendResponseHeaders(HttpStatus.HTTP_OK, data.length);
-            httpExchange.getResponseBody().write(fixTSHeader(tsUrl));
+            httpExchange.getResponseBody().write(data);
         } catch (Exception e) {
             log.warn("send response failed", e);
         }
     }
 
+    @SuppressWarnings("unchecked")
     private byte[] fixTSHeader(String tsUrl) {
-        HttpRequest request;
+        HttpRequest.Builder requestBuilder;
         byte[] data;
         boolean needFix;
         byte[] fixedData;
+        Map<String, List<String>> headers;
 
         try {
-            request = HttpRequest.newBuilder()
+            requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(tsUrl))
                     .header(HttpHeaders.USER_AGENT, BaseValues.USER_AGENT)
                     .header("Accept", "*/*")
                     .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
+                    .GET();
+            headers = (Map<String, List<String>>) CacheHelper.get(
+                    CacheKeys.PROXY_CACHE_HTTP_HEADERS + CacheKeys.AD_FILTERED_M3U8
+            );
+            if (headers != null) {
+                headers.forEach((k, v) -> {
+                    if (StringUtils.isNotBlank(k) && !v.isEmpty()) {
+                        requestBuilder.header(k, v.get(0));
+                    }
+                });
+            }
             data = HttpUtil.getClient()
-                    .send(request, HttpResponse.BodyHandlers.ofByteArray())
+                    .send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray())
                     .body();
         } catch (Exception e) {
             log.info("fetch ts content failed", e);

@@ -36,6 +36,28 @@ tasks.withType(JavaCompile).configureEach {
 application {
     mainModule = 'io.knifer.freebox'
     mainClass = 'io.knifer.freebox.FreeBoxApplication'
+    applicationDefaultJvmArgs = [
+            '--add-exports=javafx.base/com.sun.javafx.event=org.controlsfx.controls',
+            '--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED',
+            '--add-opens=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED',
+            '--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED',
+            '--add-opens=javafx.graphics/javafx.scene.text=ALL-UNNAMED',
+            '--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED'
+    ]
+}
+
+run {
+    doFirst {
+        jvmArgs = jvmArgs + [
+                '--add-exports=javafx.base/com.sun.javafx.event=org.controlsfx.controls',
+                '--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/javafx.scene.text=ALL-UNNAMED',
+                '--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED'
+        ]
+        println "JVM Args: " + jvmArgs
+    }
 }
 
 javafx {
@@ -179,13 +201,20 @@ jar {
 }
 
 run {
-    jvmArgs = [
-            '--add-exports=javafx.base/com.sun.javafx.event=org.controlsfx.controls',
-            '--add-opens=org.controlsfx.controls/org.controlsfx.control=io.knifer.freebox',
-            '--add-opens=javafx.graphics/javafx.scene=org.controlsfx.controls',
-            '--add-opens=javafx.graphics/javafx.scene.text=cn.hutool',
-            '--add-opens=javafx.graphics/javafx.scene.text=io.knifer.merged.module'
-    ]
+    doFirst {
+        jvmArgs = jvmArgs + [
+                '--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED',
+                '--add-opens=org.controlsfx.controls/org.controlsfx.control=io.knifer.freebox',
+                '--add-opens=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/com.sun.glass.ui.win=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/javafx.scene.text=ALL-UNNAMED',
+                '--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED',
+                '--add-opens=javafx.controls/javafx.scene.control.skin=ALL-UNNAMED',
+                '-Dfile.encoding=UTF-8',
+                '-Djava.net.useSystemProxies=true'
+        ]
+        println "JVM Args: " + jvmArgs
+    }
 }
 
 gluonfx {
