@@ -71,9 +71,10 @@ public class KebSocketServer extends WebSocketServer {
         
         // --- 全局拦截错误消息 (针对回调丢失的情况进行兜底提示) ---
         try {
-            // 快速过滤：只处理包含 code:210 (播放响应) 且包含 msg 字段的消息
-            if (message.contains("\"code\":210") && message.contains("\"msg\":")) {
-                JsonObject json = JsonParser.parseString(message).getAsJsonObject();
+            // 直接解析 JSON，避免字符串匹配因空格等格式问题导致漏判
+            JsonObject json = JsonParser.parseString(message).getAsJsonObject();
+            // code 210: GET_PLAYER_CONTENT 响应
+            if (json.has("code") && json.get("code").getAsInt() == 210) {
                 if (json.has("data") && json.get("data").isJsonObject()) {
                     JsonObject data = json.getAsJsonObject("data");
                     if (data.has("msg")) {
@@ -85,7 +86,7 @@ public class KebSocketServer extends WebSocketServer {
                 }
             }
         } catch (Exception e) {
-            // 忽略解析错误，不影响正常流程
+            // 忽略解析错误或非 JSON 消息
         }
         // ----------------------------------------------------
         
