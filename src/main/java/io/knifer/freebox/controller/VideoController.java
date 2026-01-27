@@ -635,6 +635,10 @@ public class VideoController extends BaseController implements Destroyable {
                                 // 传入编码后的 playUrl 替代 proxyUrl 位置，确保 PotPlayer 拿到的是编码后的
                                 updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, finalPlayUrl, encodedPlayUrl, finalHeaders, finalVideoTitle);
 
+                                // --- 【新增代码】异步检查直链有效性，针对“假直链”（如非会员返回403）进行提示 ---
+                                checkUrlAvailability(encodedPlayUrl, finalHeaders);
+                                // -------------------------------------------------------------------
+
                                 player.play(TVPlayBO.of(
                                         encodedPlayUrl, finalHeaders, finalVideoTitle, progress, false
                                 ));
@@ -737,6 +741,32 @@ public class VideoController extends BaseController implements Destroyable {
                 resultPlayUrl = playUrlForTsProxy;
             }
             callback.accept(Pair.of(isAdFiltered, resultPlayUrl));
+        });
+    }
+
+    private void checkUrlAvailability(String url, Map<String, String> headers) {
+        if (url == null || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+            return;
+        }
+
+        AsyncUtil.execute(() -> {
+            try {
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                conn.setRequestMethod("HEAD");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.setRequestProperty("User-Agent", BaseValues.USER_AGENT);
+                if (headers != null) {
+                    headers.forEach(conn::setRequestProperty);
+                }
+
+                int code = conn.getResponseCode();
+                if (code == 403 || code == 401) {
+                    Platform.runLater(() -> ToastHelper.showError("播放失败：服务端拒绝访问(" + code + ")。\n请检查是否需要会员或链接已失效。"));
+                }
+            } catch (Exception e) {
+                // 网络错误通常由播放器处理，这里不重复报错
+            }
         });
     }
 
