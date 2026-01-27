@@ -488,19 +488,34 @@ public class VideoController extends BaseController implements Destroyable {
             Movie.Video video,
             Movie.Video.UrlBean.UrlInfo urlInfo,
             Movie.Video.UrlBean.UrlInfo.InfoBean urlInfoBean,
-            @Nullable Long progress
+            Long progress
     ) {
         String flag = urlInfo.getFlag();
+        String playUrl = urlInfoBean.getUrl();
+        String sourceKey = videoDetail.getSourceKey();
+        List<String> vipParseFlags =
+                videoDetail.getVipParseFlags() == null ?
+                        List.of() :
+                        videoDetail.getVipParseFlags();
 
-        Platform.runLater(() -> player.stop());
+        if (this.player != null) {
+            this.player.stop();
+        }
+
+        // --- 关键修复：在源头清洗 URL，确保播放和显示都使用干净的链接 ---
+        if (playUrl != null) {
+            playUrl = playUrl.trim();
+            if (playUrl.startsWith("`")) playUrl = playUrl.substring(1);
+            if (playUrl.endsWith("`")) playUrl = playUrl.substring(0, playUrl.length() - 1);
+            playUrl = playUrl.trim();
+        }
+        
         template.getPlayerContent(
-                GetPlayerContentDTO.of(video.getSourceKey(), flag, urlInfoBean.getUrl()),
-                playerContentJson ->
+                GetPlayerContentDTO.of(sourceKey, flag, playUrl, vipParseFlags),
+                playerContentJson -> {
                     Platform.runLater(() -> {
                         JsonElement propsElm;
                         JsonObject propsObj;
-                        JsonElement elm;
-                        String playUrl;
                         int parse;
                         int jx;
                         Map<String, String> headers;
@@ -510,12 +525,26 @@ public class VideoController extends BaseController implements Destroyable {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
                             return;
                         }
+                        
+                        // 尝试获取 nameValuePairs (Android Bundle 序列化结构)
                         propsElm = playerContentJson.get("nameValuePairs");
-                        if (propsElm == null) {
-                            ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
-                            return;
+                        if (propsElm != null) {
+                            propsObj = propsElm.getAsJsonObject();
+                        } else {
+                            // 如果没有 nameValuePairs，直接使用 playerContentJson 本身
+                            propsObj = playerContentJson;
                         }
-                        propsObj = propsElm.getAsJsonObject();
+
+                        // --- 【新增代码】优先检查是否有错误提示信息 ---
+                        if (propsObj.has("msg")) {
+                            String errorMsg = propsObj.get("msg").getAsString();
+                            if (StringUtils.isNotBlank(errorMsg)) {
+                                Platform.runLater(() -> ToastHelper.showError(errorMsg));
+                                return;
+                            }
+                        }
+                        // ------------------------------------------
+                        
                         elm = propsObj.get("url");
                         if (elm == null) {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
@@ -556,10 +585,15 @@ public class VideoController extends BaseController implements Destroyable {
                             );
                         }
                         videoTitle = "《" + video.getName() + "》" + flag + " - " + urlInfoBean.getName();
+                        
+                        final String finalPlayUrl = playUrl;
+                        final Map<String, String> finalHeaders = headers;
+                        final String finalVideoTitle = videoTitle;
+                        
                         if (parse == 0) {
-                            if (ConfigHelper.getAdFilter() && playUrl.contains(".m3u8")) {
+                            if (ConfigHelper.getAdFilter() && finalPlayUrl.contains(".m3u8")) {
                                 // 处理m3u8广告过滤、ts代理
-                                filterAdAndProxy(playUrl, headers, isAdFilteredAndProxyUrl -> {
+                                filterAdAndProxy(finalPlayUrl, finalHeaders, isAdFilteredAndProxyUrl -> {
                                     Boolean isAdFiltered = isAdFilteredAndProxyUrl.getLeft();
                                     String rawProxyUrl = isAdFilteredAndProxyUrl.getRight();
                                     // 确保代理链接是经过 URL 编码的（处理中文路径）
@@ -567,8 +601,8 @@ public class VideoController extends BaseController implements Destroyable {
                                     
                                     TVPlayBO tvPlayBO = TVPlayBO.of(
                                             proxyUrl,
-                                            headers,
-                                            videoTitle,
+                                            finalHeaders,
+                                            finalVideoTitle,
                                             progress,
                                             isAdFiltered
                                     );
@@ -576,14 +610,14 @@ public class VideoController extends BaseController implements Destroyable {
                                     Platform.runLater(() -> {
                                         // --- 【新增代码：情况1】记录代理后的URL ---
                                         this.currentPlayUrl = proxyUrl;
-                                        this.currentPlayHeaders = headers;
-                                        this.currentVideoTitle = videoTitle;
+                                        this.currentPlayHeaders = finalHeaders;
+                                        this.currentVideoTitle = finalVideoTitle;
                                         if (openInPotPlayerBtn != null) openInPotPlayerBtn.setDisable(false);
                                         // ------------------------------------
 
                                         // 更新详细信息 Tooltip
                                         // 注意：playUrl 保持原始（未解码或源接口返回的状态），proxyUrl 是已编码的
-                                        updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, proxyUrl, headers, videoTitle);
+                                        updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, finalPlayUrl, proxyUrl, finalHeaders, finalVideoTitle);
 
                                         player.play(tvPlayBO);
                                     });
@@ -601,10 +635,10 @@ public class VideoController extends BaseController implements Destroyable {
 
                                 // 更新详细信息 Tooltip
                                 // 传入编码后的 playUrl 替代 proxyUrl 位置，确保 PotPlayer 拿到的是编码后的
-                                updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, playUrl, encodedPlayUrl, headers, videoTitle);
+                                updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, finalPlayUrl, encodedPlayUrl, finalHeaders, finalVideoTitle);
 
                                 player.play(TVPlayBO.of(
-                                        encodedPlayUrl, headers, videoTitle, progress, false
+                                        encodedPlayUrl, finalHeaders, finalVideoTitle, progress, false
                                 ));
                             }
                         } else {
@@ -612,13 +646,14 @@ public class VideoController extends BaseController implements Destroyable {
                                 ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_SOURCE_NOT_SUPPORTED);
                                 return;
                             }
-                            player.setVideoTitle(videoTitle + " （此为解析源，请在弹出的浏览器程序中观看）");
-                            HostServiceHelper.showDocument(playUrl);
+                            player.setVideoTitle(finalVideoTitle + " （此为解析源，请在弹出的浏览器程序中观看）");
+                            HostServiceHelper.showDocument(finalPlayUrl);
                         }
                         playingVideo = video;
                         playingUrlInfo = urlInfo;
                         playingInfoBean = urlInfoBean;
-                    })
+                    });
+                }
         );
     }
 
