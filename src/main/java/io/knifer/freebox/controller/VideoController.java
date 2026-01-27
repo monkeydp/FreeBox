@@ -623,11 +623,11 @@ public class VideoController extends BaseController implements Destroyable {
                             } else {
                                 // --- 【新增代码：情况2】记录原始URL ---
                                 // 如果没有代理，playUrl 也可能包含中文，需要确保编码
-                                String encodedPlayUrl = safeEncodeUrl(playUrl);
+                                String encodedPlayUrl = safeEncodeUrl(finalPlayUrl);
                                 
                                 this.currentPlayUrl = encodedPlayUrl;
-                                this.currentPlayHeaders = headers;
-                                this.currentVideoTitle = videoTitle;
+                                this.currentPlayHeaders = finalHeaders;
+                                this.currentVideoTitle = finalVideoTitle;
                                 if (openInPotPlayerBtn != null) openInPotPlayerBtn.setDisable(false);
                                 // ------------------------------------
 
