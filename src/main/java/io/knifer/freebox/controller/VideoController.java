@@ -506,7 +506,9 @@ public class VideoController extends BaseController implements Destroyable {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
                             return;
                         }
-                        playUrl = URLDecoder.decode(playUrl, Charsets.UTF_8);
+                        // 移除解码逻辑，保持 URL 编码状态，避免中文路径导致播放器无法识别
+                        // playUrl = URLDecoder.decode(playUrl, Charsets.UTF_8);
+                        
                         // --- 关键修复：在源头清洗 URL，确保播放和显示都使用干净的链接 ---
                         if (playUrl != null) {
                             playUrl = playUrl.trim();
@@ -919,6 +921,7 @@ public class VideoController extends BaseController implements Destroyable {
                 String cleanProxy = proxyUrl.replaceAll("\\s+", "");
                 String cleanDecoded = decodedUrl.replaceAll("\\s+", "");
                 
+                // 确保确实不同（如果 cleanProxy 本身就是解码状态，或者解码前后一致，则不显示第二行）
                 if (StringUtils.isNotBlank(decodedUrl) && !cleanProxy.equalsIgnoreCase(cleanDecoded)) {
                     sb.append("\n");
                     sb.append(processUrlStr(decodedUrl, forDisplay)).append("\n");
