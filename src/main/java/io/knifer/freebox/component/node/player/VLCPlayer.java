@@ -228,7 +228,21 @@ public class VLCPlayer extends BasePlayer<ImageView> {
             command.add("/title=\"" + title + "\"");
 
             // 启动外部播放
-            new ProcessBuilder(command).start();
+            ProcessBuilder pb = new ProcessBuilder(command);
+            // 关键修复：重定向输出流以防止缓冲区填满导致 PotPlayer 卡死
+            // 优先尝试 DISCARD (Java 9+)，为了兼容性这里使用 INHERIT (继承父进程IO) 或重定向到空文件
+            // 这里使用 INHERIT 最简单且安全，或者直接不关心输出
+            try {
+                // 尝试使用 DISCARD (Java 9+)
+                pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            } catch (NoSuchFieldError | Exception e) {
+                // 如果是 Java 8，回退到 INHERIT
+                pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            }
+            
+            pb.start();
 
             // 停止内部播放
             this.stop();
@@ -267,6 +281,16 @@ public class VLCPlayer extends BasePlayer<ImageView> {
                     "/referrer=\"" + ref + "\""
             );
             log.info("启动 PotPlayer 命令参数: {}", pb.command());
+            
+            // 修复 IO 阻塞问题
+            try {
+                pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            } catch (NoSuchFieldError | Exception e) {
+                pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            }
+            
             pb.start();
             return true;
         } catch (Exception e) {
