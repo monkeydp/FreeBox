@@ -541,6 +541,34 @@ public class VideoController extends BaseController implements Destroyable {
                             if (finalPlayUrlStr.endsWith("`")) finalPlayUrlStr = finalPlayUrlStr.substring(0, finalPlayUrlStr.length() - 1);
                             finalPlayUrlStr = finalPlayUrlStr.trim();
                             
+                            // --- 【新增逻辑】自动替换 Localhost 为远程客户端 IP ---
+                            // 配合安卓端 9978 端口开放修改，解决 PC 无法访问手机 127.0.0.1 的问题
+                            try {
+                                ClientInfo client = Context.INSTANCE.getClientManager().getCurrentClientImmediately();
+                                if (client != null && client.isOpen()) {
+                                    String remoteIp = client.getName();
+                                    // 确保获取到的是有效 IP 且不是本机回环
+                                    if (StringUtils.isNotBlank(remoteIp) 
+                                            && !remoteIp.equals("127.0.0.1") 
+                                            && !remoteIp.equals("localhost")
+                                            && !remoteIp.equals("0:0:0:0:0:0:0:1")) {
+                                        
+                                        if (finalPlayUrlStr.contains("127.0.0.1:9978")) {
+                                            String newUrl = finalPlayUrlStr.replace("127.0.0.1", remoteIp);
+                                            log.info("Redirect 127.0.0.1 to Remote IP: {} -> {}", finalPlayUrlStr, newUrl);
+                                            finalPlayUrlStr = newUrl;
+                                        } else if (finalPlayUrlStr.contains("localhost:9978")) {
+                                            String newUrl = finalPlayUrlStr.replace("localhost", remoteIp);
+                                            log.info("Redirect localhost to Remote IP: {} -> {}", finalPlayUrlStr, newUrl);
+                                            finalPlayUrlStr = newUrl;
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                log.warn("Failed to redirect localhost to remote IP", e);
+                            }
+                            // -----------------------------------------------------------
+
                             // 同时更新 JSON 对象里的 URL，确保 Tooltip 显示的 JSON 也是干净的
                             if (propsObj != null && propsObj.has("url")) {
                                 propsObj.addProperty("url", finalPlayUrlStr);
