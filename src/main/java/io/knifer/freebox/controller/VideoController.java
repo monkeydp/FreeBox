@@ -996,6 +996,12 @@ public class VideoController extends BaseController implements Destroyable {
             sb.append("\n\n");
         }
 
+        // 新增：【直链】(Parsed URL) - 方便用户查看最终解析出的真实地址
+        if (StringUtils.isNotBlank(playUrl)) {
+             sb.append("【直链】\n");
+             sb.append(processUrlStr(playUrl, forDisplay)).append("\n\n");
+        }
+
         // 3. 【中转链】
         if (StringUtils.isNotBlank(proxyUrl)) {
             sb.append("【中转链】\n");
