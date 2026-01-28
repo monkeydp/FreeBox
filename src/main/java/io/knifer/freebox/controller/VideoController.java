@@ -553,8 +553,6 @@ public class VideoController extends BaseController implements Destroyable {
                             ToastHelper.showErrorI18n(I18nKeys.VIDEO_ERROR_NO_DATA);
                             return;
                         }
-                        // 移除解码逻辑，保持 URL 编码状态，避免中文路径导致播放器无法识别
-                        // playUrl = URLDecoder.decode(playUrl, Charsets.UTF_8);
                         
                         // --- 关键修复：在源头清洗 URL，确保播放和显示都使用干净的链接 ---
                         if (finalPlayUrlStr != null) {
