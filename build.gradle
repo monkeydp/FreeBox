@@ -247,6 +247,23 @@ jlink {
         doFirst {
             delete "${projectDir}/jpackage_temp"
         }
+        doLast {
+            def jpackageDest = project.file("${buildDir}/jpackage")
+            if (jpackageDest.exists()) {
+                 jpackageDest.eachFile { file ->
+                     def currentVersion = project.version.toString()
+                     if (file.name.endsWith(".msi") && !file.name.contains(currentVersion)) {
+                         // The generated file likely uses the sanitized version (1.6.0), rename it to include the full version (1.6.0-patch1)
+                         def sanitizedVersion = currentVersion.split("-")[0]
+                         if (file.name.contains(sanitizedVersion)) {
+                             def newName = file.name.replace(sanitizedVersion, currentVersion)
+                             file.renameTo(new File(file.parent, newName))
+                             println "Renamed installer to: ${newName}"
+                         }
+                     }
+                 }
+            }
+        }
     }
     jpackage {
         mainClassName = application.mainClass
@@ -254,7 +271,7 @@ jlink {
         installerType = project.hasProperty('jpackage.installerType') ?
                 project.getProperties().get('jpackage.installerType') :
                 'msi'
-        appVersion = project.version
+        appVersion = project.version.toString().split("-")[0]
         vendor = 'knifer'
         installerOptions = [
                 '--verbose',
