@@ -904,7 +904,7 @@ public class VideoController extends BaseController implements Destroyable {
         tooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
         tooltip.setStyle("-fx-font-size: 14px;");
         
-        // 强制左侧显示
+        // 强制左侧显示，并置顶以利用最大垂直空间
         tooltip.setOnShowing(ev -> {
             if (root.getScene() != null && root.getScene().getWindow() != null) {
                 javafx.stage.Window window = root.getScene().getWindow();
@@ -914,6 +914,8 @@ public class VideoController extends BaseController implements Destroyable {
                 Screen screen = screens.isEmpty() ? Screen.getPrimary() : screens.get(0);
                 Rectangle2D bounds = screen.getVisualBounds();
                 tooltip.setX(bounds.getMinX() + 20);
+                // 同时也设置 Y 坐标到屏幕顶部，防止内容过长导致底部被遮挡
+                tooltip.setY(bounds.getMinY() + 20);
             }
         });
 
