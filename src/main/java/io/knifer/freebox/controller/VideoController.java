@@ -83,26 +83,6 @@ import java.util.function.Consumer;
 @Slf4j
 public class VideoController extends BaseController implements Destroyable {
 
-    private String safeEncodeUrl(String url) {
-        if (url == null) return null;
-        try {
-            // 使用 URI 类来自动编码非 ASCII 字符（如中文），同时保留 :// 等结构
-            // 注意：URI 构造器可能会抛出异常如果 URL 格式非常不标准
-            // 先尝试整体转换，如果不行再手动处理
-            String encoded = url.replace(" ", "%20"); // 简单处理空格
-            // 匹配中文字符进行编码
-            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("[\\u4e00-\\u9fa5]+").matcher(encoded);
-            StringBuilder sb = new StringBuilder();
-            while (matcher.find()) {
-                matcher.appendReplacement(sb, URLEncoder.encode(matcher.group(), StandardCharsets.UTF_8));
-            }
-            matcher.appendTail(sb);
-            return sb.toString();
-        } catch (Exception e) {
-            return url;
-        }
-    }
-
     @FXML
     private Button openInPotPlayerBtn;
 
@@ -581,19 +561,19 @@ public class VideoController extends BaseController implements Destroyable {
                             );
                         }
                         videoTitle = "《" + video.getName() + "》" + flag + " - " + urlInfoBean.getName();
-                        
+
                         final String finalPlayUrl = finalPlayUrlStr;
                         final Map<String, String> finalHeaders = headers;
                         final String finalVideoTitle = videoTitle;
+                        final boolean finalIsExtracted = false;
                         
                         if (parse == 0) {
-                            if (ConfigHelper.getAdFilter() && finalPlayUrl.contains(".m3u8")) {
+                            if (!finalIsExtracted && ConfigHelper.getAdFilter() && finalPlayUrl.contains(".m3u8")) {
                                 // 处理m3u8广告过滤、ts代理
                                 filterAdAndProxy(finalPlayUrl, finalHeaders, isAdFilteredAndProxyUrl -> {
                                     Boolean isAdFiltered = isAdFilteredAndProxyUrl.getLeft();
                                     String rawProxyUrl = isAdFilteredAndProxyUrl.getRight();
-                                    // 确保代理链接是经过 URL 编码的（处理中文路径）
-                                    String proxyUrl = safeEncodeUrl(rawProxyUrl);
+                                    String proxyUrl = rawProxyUrl;
                                     
                                     TVPlayBO tvPlayBO = TVPlayBO.of(
                                             proxyUrl,
@@ -620,8 +600,7 @@ public class VideoController extends BaseController implements Destroyable {
                                 });
                             } else {
                                 // --- 【新增代码：情况2】记录原始URL ---
-                                // 如果没有代理，playUrl 也可能包含中文，需要确保编码
-                                String encodedPlayUrl = safeEncodeUrl(finalPlayUrl);
+                                String encodedPlayUrl = finalPlayUrl;
                                 
                                 this.currentPlayUrl = encodedPlayUrl;
                                 this.currentPlayHeaders = finalHeaders;
@@ -632,10 +611,6 @@ public class VideoController extends BaseController implements Destroyable {
                                 // 更新详细信息 Tooltip
                                 // 传入编码后的 playUrl 替代 proxyUrl 位置，确保 PotPlayer 拿到的是编码后的
                                 updateInfo(selectedEpBtn, urlInfoBean.getUrl(), playerContentJson, finalPlayUrl, encodedPlayUrl, finalHeaders, finalVideoTitle);
-
-                                // --- 【新增代码】异步检查直链有效性，针对“假直链”（如非会员返回403）进行提示 ---
-                                checkUrlAvailability(encodedPlayUrl, finalHeaders);
-                                // -------------------------------------------------------------------
 
                                 player.play(TVPlayBO.of(
                                         encodedPlayUrl, finalHeaders, finalVideoTitle, progress, false
@@ -739,32 +714,6 @@ public class VideoController extends BaseController implements Destroyable {
                 resultPlayUrl = playUrlForTsProxy;
             }
             callback.accept(Pair.of(isAdFiltered, resultPlayUrl));
-        });
-    }
-
-    private void checkUrlAvailability(String url, Map<String, String> headers) {
-        if (url == null || (!url.startsWith("http://") && !url.startsWith("https://"))) {
-            return;
-        }
-
-        AsyncUtil.execute(() -> {
-            try {
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                conn.setRequestMethod("HEAD");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.setRequestProperty("User-Agent", BaseValues.USER_AGENT);
-                if (headers != null) {
-                    headers.forEach(conn::setRequestProperty);
-                }
-
-                int code = conn.getResponseCode();
-                if (code == 403 || code == 401) {
-                    Platform.runLater(() -> ToastHelper.showError("播放失败：服务端拒绝访问(" + code + ")。\n请检查是否需要会员或链接已失效。"));
-                }
-            } catch (Exception e) {
-                // 网络错误通常由播放器处理，这里不重复报错
-            }
         });
     }
 

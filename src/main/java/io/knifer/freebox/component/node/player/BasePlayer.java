@@ -148,6 +148,8 @@ public abstract class BasePlayer<T extends Node> {
     private final BooleanProperty isError = new SimpleBooleanProperty(false);
     private final SimpleStringProperty epgServiceUrlProperty = new SimpleStringProperty();
 
+    private long lastPlayStartTime = 0;
+
     private PopOver videoInfoPopOver;
 
     private final DoubleBinding paneWidthProp;
@@ -830,7 +832,13 @@ public abstract class BasePlayer<T extends Node> {
     }
 
     protected void postFinished() {
-        stepForwardRunnable.run();
+        Platform.runLater(() -> {
+            if (System.currentTimeMillis() - lastPlayStartTime < 5000) {
+                showToast("播放失败或结束过快，已停止切集");
+                return;
+            }
+            stepForwardRunnable.run();
+        });
     }
 
     protected void postError() {
@@ -1054,6 +1062,7 @@ public abstract class BasePlayer<T extends Node> {
      * @return 是否成功播放
      */
     protected boolean doPlay(String url, Map<String, String> headers, String videoTitle, @Nullable Long progress) {
+        lastPlayStartTime = System.currentTimeMillis();
         if (destroyFlag) {
 
             return false;
